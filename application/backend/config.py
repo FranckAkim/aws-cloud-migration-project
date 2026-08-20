@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     app_env: str = "development"
     api_port: int = 8000
     log_level: str = "INFO"
+    app_version: str = "0.1.0"
     secret_key: SecretStr
     jwt_expiration: int = 60
 

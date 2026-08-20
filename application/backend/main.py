@@ -14,8 +14,9 @@ logger = logging.getLogger("novatech")
 app = FastAPI(title="NovaTech API")
 
 logger.info(
-    "Starting NovaTech API | env=%s | port=%s | secret_key_set=%s",
+    "Starting NovaTech API | env=%s | version=%s | port=%s | secret_key_set=%s | jwt_expiration=%s",
     settings.app_env,
+    settings.app_version,
     settings.api_port,
     bool(settings.secret_key.get_secret_value()),
     settings.jwt_expiration,
@@ -24,7 +25,7 @@ logger.info(
 
 @app.get("/health")
 def health():
-    return {"status": "healthy", "environment": settings.app_env, "version": "1.0.0",}
+    return {"status": "healthy", "environment": settings.app_env, "version": settings.app_version,}
 
 
 if __name__ == "__main__":
