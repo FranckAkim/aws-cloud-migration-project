@@ -90,3 +90,5 @@ def create_order(order: OrderCreate):
         raise HTTPException(status_code=404, detail="Product not found")
     except db.InsufficientStock:
         raise HTTPException(status_code=409, detail="Insufficient stock")
+
+# cache experiment
