@@ -14,6 +14,50 @@ Read section 3 by covering the answers first. An answer you can recognize is not
 
 ---
 
+## Build steps, in order
+
+What was actually done in these phases, condensed to the steps that matter, each with the check that proves it worked.
+
+**Environment**
+
+1. Inventory the machine before installing anything: `git --version`, `code --version`, `python --version`, `docker --version`, `docker compose version`, `terraform -version`, `aws --version`, `psql --version`. **Errors are findings, not failures** — they tell you precisely what is missing.
+2. Install what's missing with the platform package manager (`winget` on Windows, `apt` on Ubuntu). *Verify:* re-run the version command **in a new terminal** — an existing shell holds a stale copy of `PATH`.
+3. Decide *not* to install PostgreSQL locally; it will run in a container instead.
+4. Set up **WSL2 with Ubuntu** as the Linux workspace: `wsl --status`, then `wsl --install -d Ubuntu`. *Verify:* `whoami`, `pwd`, `uname -a`, `cat /etc/os-release`.
+5. `sudo apt update && sudo apt upgrade -y`. *Verify:* re-running `apt update` reports far fewer upgradable packages.
+6. Decide where the repository lives. **Not inside OneDrive** (the sync client fights Git), and preferably on the **Linux filesystem** rather than `/mnt/c` or `/mnt/d`, which is slower and reports metadata unreliably.
+
+**Repository**
+
+7. Create the GitHub repo, clone it, and work from the **command line** rather than a GUI — every server you will touch later has no GUI.
+8. Set `user.name` and `user.email` — separately on each machine, since each Git installation has its own global config.
+9. Write `README.md` with the company scenario and the migration rationale. Commit with a message that says *what and why*, then **push** — a commit is local; only a push makes work exist elsewhere.
+10. Add `.gitattributes` containing `* text=auto eol=lf` so line endings are normalised **in the repository**, not per machine.
+11. Add `.gitignore` **before** any commit that could sweep up a secret: `.venv/`, `__pycache__/`, `*.pyc`, `.env`. *Verify:* `git status` before and after — the ignored paths disappear.
+
+**Design before code**
+
+12. Write `docs/application-design.md`: data model, endpoints, authentication approach, configuration list — and record every deliberate simplification **as a decision with a reason**, not as a silent omission.
+13. Decide and defend the load-bearing choices: stateless JWTs, soft delete, `unit_price` stored on the order, a database-aware `/health`, and atomic inventory decrement. Write the **trade-off each one accepts** alongside it.
+
+**The application**
+
+14. Create the project structure and a virtual environment: `python3 -m venv .venv` → `source .venv/bin/activate`. *Verify:* `(.venv)` in the prompt and `which python` pointing inside it. Activation is **per shell**, every time.
+15. `pip install fastapi uvicorn` → `pip freeze > requirements.txt`. The venv is disposable; the pinned file is the asset.
+16. Write `main.py` with a single `GET /health`. Run it, `curl` it, then find it in `sudo ss -tulpn` and read the **bind address**.
+17. Restart bound to `0.0.0.0` and compare the `ss` output. Understand that this means "every interface", **not** "public" — reachability is decided by firewalls and network topology.
+
+**Configuration and secrets**
+
+18. `pip install pydantic-settings`. Create `config.py` with a typed `Settings` class reading from the environment and a `.env` file, where **real environment variables take precedence** over the file.
+19. Give every harmless setting a default and give the dangerous ones **none** — `SECRET_KEY` must have no default, because there is no safe value to default to.
+20. Tighten it further with `Field(min_length=16)`: *required* means present, and an empty string is present. Wrap it in `SecretStr` so it can never be printed by accident into a log or traceback.
+21. Create `.env` (never committed) and **`.env.example` (committed)** with the same keys and blank secrets, so a fresh clone knows what to supply without anything leaking.
+22. Move startup work into a **lifespan handler** rather than module top level, and log the PID — module-level code runs once per import, per process.
+23. *Verify all three:* the startup log shows the values; changing `API_PORT` and **restarting** moves the listening port (a running process never re-reads its environment); deleting `SECRET_KEY` makes the app refuse to start, naming the field.
+
+---
+
 # 1. Concepts
 
 ## 1.1 Cloud migration fundamentals
