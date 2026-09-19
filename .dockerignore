@@ -1,9 +1,13 @@
-.venv/
-__pycache__/
-*.pyc
-.env
+# Patterns here are anchored to the build-context root, unlike .gitignore.
+# "**/" makes them match at any depth.
+**/.env
+**/.venv/
+**/__pycache__/
+**/*.pyc
 .git/
 .gitignore
 .gitattributes
 docs/
+tests/
 *.md
+requirements-dev.txt
