@@ -31,6 +31,7 @@ def _conninfo() -> str:
         f"dbname={settings.database_name} "
         f"user={settings.database_user} "
         f"password={settings.database_password.get_secret_value()} "
+        f"sslmode={settings.database_sslmode} "
         f"connect_timeout=3"
     )
 

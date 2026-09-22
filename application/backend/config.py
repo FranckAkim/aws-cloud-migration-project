@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     database_name: str = "novatech"
     database_user: str = "novatech"
     database_password: SecretStr
+    # 'prefer' locally (plain container), 'require' against RDS, which
+    # refuses unencrypted connections anyway (rds.force_ssl=1).
+    database_sslmode: str = "prefer"
     db_pool_min: int = 1
     db_pool_max: int = 5
 

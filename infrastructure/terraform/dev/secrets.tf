@@ -33,3 +33,17 @@ output "app_db_secret_arn" {
 output "app_db_secret_name" {
   value = aws_secretsmanager_secret.app_db.name
 }
+
+# The JWT signing key. Same pattern: Terraform owns the container, the value is
+# written once from a generator and never seen by a person.
+# COST: ~$0.40/month.
+resource "aws_secretsmanager_secret" "app_jwt" {
+  name        = "${local.name}/app/secret-key"
+  description = "NovaTech JWT signing key. Value is set out of band."
+
+  recovery_window_in_days = 0
+}
+
+output "app_jwt_secret_arn" {
+  value = aws_secretsmanager_secret.app_jwt.arn
+}
