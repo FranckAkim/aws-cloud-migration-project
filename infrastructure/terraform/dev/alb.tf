@@ -2,7 +2,17 @@
 # COST: ~$0.0225/hour (~$16/month) plus a small per-LCU charge, billed from the
 # moment it exists. Destroy it when you are not using the environment.
 
+# Master switch for the serving layer. Off by default, because the load
+# balancer bills ~$16/month whether or not anything uses it.
+variable "enable_app" {
+  description = "Create the load balancer and run the ECS service"
+  type        = bool
+  default     = false
+}
+
 resource "aws_lb" "main" {
+  count = var.enable_app ? 1 : 0
+
   name               = local.name
   load_balancer_type = "application"
   internal           = false
@@ -22,6 +32,8 @@ resource "aws_lb" "main" {
 # The target group holds the things traffic is sent to. target_type = "ip"
 # because Fargate tasks have their own ENI and IP, not an instance id.
 resource "aws_lb_target_group" "api" {
+  count = var.enable_app ? 1 : 0
+
   name        = "${local.name}-api"
   port        = var.container_port
   protocol    = "HTTP"
@@ -56,21 +68,23 @@ resource "aws_lb_target_group" "api" {
 # certificate, which needs a domain name (Route 53 ~$12/year, ACM certificates
 # free). When a domain exists, this becomes a redirect to a 443 listener.
 resource "aws_lb_listener" "http" {
-  load_balancer_arn = aws_lb.main.arn
+  count = var.enable_app ? 1 : 0
+
+  load_balancer_arn = aws_lb.main[0].arn
   port              = 80
   protocol          = "HTTP"
 
   default_action {
     type             = "forward"
-    target_group_arn = aws_lb_target_group.api.arn
+    target_group_arn = aws_lb_target_group.api[0].arn
   }
 }
 
 output "alb_dns_name" {
   description = "Public hostname of the load balancer"
-  value       = aws_lb.main.dns_name
+  value       = one(aws_lb.main[*].dns_name)
 }
 
 output "app_url" {
-  value = "http://${aws_lb.main.dns_name}"
+  value = var.enable_app ? "http://${aws_lb.main[0].dns_name}" : null
 }

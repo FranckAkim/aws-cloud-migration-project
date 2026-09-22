@@ -3,6 +3,14 @@
 variable "image_tag" {
   description = "Image tag to deploy. A git SHA, never 'latest': a deploy must name exactly one image."
   type        = string
+
+  # Catches placeholders and typos at plan time instead of after AWS has spent
+  # two minutes building a load balancer. Docker tags allow letters, digits,
+  # underscore, period and dash only, and cannot start with . or -.
+  validation {
+    condition     = can(regex("^[a-zA-Z0-9_][a-zA-Z0-9._-]{0,127}$", var.image_tag))
+    error_message = "image_tag must be a valid Docker tag (letters, digits, _ . -). Did you paste a placeholder like <sha>?"
+  }
 }
 
 variable "container_port" {
@@ -22,6 +30,16 @@ variable "task_memory" {
   description = "Fargate memory in MiB. Valid values depend on task_cpu."
   type        = number
   default     = 512
+}
+
+# ECS Exec opens a shell inside a running task, through Session Manager. Useful
+# for incident response and one-off admin work; off by default because a shell
+# in production is a privilege, not a convenience. Every session is authorised
+# by IAM and can be logged.
+variable "enable_exec" {
+  description = "Allow `aws ecs execute-command` into running tasks"
+  type        = bool
+  default     = false
 }
 
 variable "desired_count" {
@@ -85,6 +103,28 @@ resource "aws_iam_role" "task" {
   name               = "${local.name}-ecs-task"
   assume_role_policy = data.aws_iam_policy_document.ecs_assume.json
   # Deliberately no policies: the application calls no AWS APIs.
+}
+
+# Only attached when ECS Exec is switched on. These four actions are what the
+# SSM agent inside the task needs to open the session channel.
+data "aws_iam_policy_document" "task_exec" {
+  statement {
+    actions = [
+      "ssmmessages:CreateControlChannel",
+      "ssmmessages:CreateDataChannel",
+      "ssmmessages:OpenControlChannel",
+      "ssmmessages:OpenDataChannel",
+    ]
+    resources = ["*"] # these actions do not support resource-level permissions
+  }
+}
+
+resource "aws_iam_role_policy" "task_exec" {
+  count = var.enable_exec ? 1 : 0
+
+  name   = "ecs-exec"
+  role   = aws_iam_role.task.id
+  policy = data.aws_iam_policy_document.task_exec.json
 }
 
 # ------------------------------------------------------------------- cluster
@@ -183,20 +223,24 @@ resource "aws_ecs_task_definition" "api" {
 # balancer, and replaces any that die.
 
 resource "aws_ecs_service" "api" {
+  count = var.enable_app ? 1 : 0
+
   name            = "${local.name}-api"
   cluster         = aws_ecs_cluster.main.id
   task_definition = aws_ecs_task_definition.api.arn
   desired_count   = var.desired_count
   launch_type     = "FARGATE"
 
+  enable_execute_command = var.enable_exec
+
   network_configuration {
-    subnets          = aws_subnet.app[*].id      # private
+    subnets          = aws_subnet.app[*].id # private
     security_groups  = [aws_security_group.app.id]
-    assign_public_ip = false                     # image pulls go out via NAT
+    assign_public_ip = false # image pulls go out via NAT
   }
 
   load_balancer {
-    target_group_arn = aws_lb_target_group.api.arn
+    target_group_arn = aws_lb_target_group.api[0].arn
     container_name   = "api"
     container_port   = var.container_port
   }
@@ -224,7 +268,7 @@ output "ecs_cluster_name" {
 }
 
 output "ecs_service_name" {
-  value = aws_ecs_service.api.name
+  value = one(aws_ecs_service.api[*].name)
 }
 
 output "log_group" {
