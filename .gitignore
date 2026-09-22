@@ -2,3 +2,16 @@
 __pycache__/
 *.pyc
 .env
+
+# Terraform: state can contain secrets and is stored in S3, never in git
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+*.tfvars
+!*.tfvars.example
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
