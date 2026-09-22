@@ -29,3 +29,23 @@ output "ecr_repository_url" {
 output "nat_enabled" {
   value = var.enable_nat
 }
+
+output "db_endpoint" {
+  description = "Hostname:port of the database. Resolvable only inside the VPC."
+  value       = aws_db_instance.main.endpoint
+}
+
+output "db_name" {
+  value = aws_db_instance.main.db_name
+}
+
+output "db_username" {
+  value = aws_db_instance.main.username
+}
+
+# The ARN only. The password itself is never an output, never in state, and is
+# read at runtime from Secrets Manager by whatever needs it.
+output "db_master_secret_arn" {
+  description = "Secrets Manager secret holding the master credentials"
+  value       = aws_db_instance.main.master_user_secret[0].secret_arn
+}
